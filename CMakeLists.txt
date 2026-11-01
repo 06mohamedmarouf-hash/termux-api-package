@@ -4,6 +4,9 @@ include(GNUInstallDirs)
 
 set(TERMUX_PREFIX ${CMAKE_INSTALL_PREFIX})
 
+# Embed the selected Termux prefix into the helper binaries.
+add_compile_definitions(PREFIX=\"${TERMUX_PREFIX}\")
+
 add_library(termux-api SHARED termux-api.c)
 add_library(termux-api-static STATIC termux-api.c)
 set_target_properties(termux-api-static PROPERTIES OUTPUT_NAME termux-api)
