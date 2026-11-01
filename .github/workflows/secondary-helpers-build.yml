@@ -1,0 +1,57 @@
+name: Build secondary Termux API helper binaries
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Android SDK and NDK
+        uses: android-actions/setup-android@v3
+        with:
+          ndk-version: 29.0.14206865
+          cmake-version: 3.31.6
+
+      - name: Configure ARM64 build
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DCMAKE_INSTALL_PREFIX=/data/data/com.termux.secondary/files/usr
+
+      - name: Compile helper binaries and scripts
+        run: cmake --build build --parallel
+
+      - name: Assemble installable prefix archive
+        run: |
+          set -euo pipefail
+          mkdir -p stage/bin stage/lib stage/libexec stage/include
+          cp build/scripts/termux-* stage/bin/
+          cp build/termux-callback stage/libexec/
+          cp build/termux-api-broadcast stage/libexec/
+          cp build/libtermux-api.so build/libtermux-api.a stage/lib/
+          cp termux-api.h stage/include/
+          ln -s termux-api-broadcast stage/libexec/termux-api
+          chmod 700 stage/bin/termux-* stage/libexec/termux-callback stage/libexec/termux-api-broadcast
+          tar -C stage -czf termux-api-helpers-secondary-arm64.tar.gz .
+          sha256sum termux-api-helpers-secondary-arm64.tar.gz
+
+      - name: Upload ARM64 helper archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: termux-secondary-api-helpers-arm64
+          path: termux-api-helpers-secondary-arm64.tar.gz
+          if-no-files-found: error
+          retention-days: 14
